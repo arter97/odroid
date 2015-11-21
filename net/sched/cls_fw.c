@@ -213,10 +213,8 @@ fw_change_attrs(struct net *net, struct tcf_proto *tp, struct fw_filter *f,
 	if (tb[TCA_FW_INDEV]) {
 		int ret;
 		ret = tcf_change_indev(net, tb[TCA_FW_INDEV]);
-		if (ret < 0) {
-			err = ret;
+		if (ret < 0)
 			goto errout;
-		}
 		f->ifindex = ret;
 	}
 #endif /* CONFIG_NET_CLS_IND */
