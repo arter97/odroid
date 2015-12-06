@@ -150,10 +150,6 @@ static int s2m_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 	s2m_data_to_tm(data, tm, info->rtc_24hr_mode);
 
-	printk(KERN_DEBUG "%s: %d/%d/%d %d:%d:%d(%d)\n", __func__,
-		1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday,
-		tm->tm_hour, tm->tm_min, tm->tm_sec, tm->tm_wday);
-
 	return rtc_valid_tm(tm);
 }
 
@@ -170,10 +166,6 @@ static int s2m_rtc_set_time(struct device *dev, struct rtc_time *tm)
 		return ret;
 
 	ret = s2m_rtc_set_time_reg(info, 0);
-
-	printk(KERN_DEBUG "%s: %d/%d/%d %d:%d:%d(%d)\n", __func__,
-		1900 + tm->tm_year, 1 + tm->tm_mon, tm->tm_mday,
-		tm->tm_hour, tm->tm_min, tm->tm_sec, tm->tm_wday);
 
 	return ret;
 }
@@ -274,10 +266,6 @@ static int s2m_rtc_stop_alarm(struct s2m_rtc_info *info)
 		return ret;
 
 	s2m_data_to_tm(data, &tm, info->rtc_24hr_mode);
-
-	printk(KERN_DEBUG "%s: %d/%d/%d %d:%d:%d(%d)\n", __func__,
-		1900 + tm.tm_year, 1 + tm.tm_mon, tm.tm_mday,
-		tm.tm_hour, tm.tm_min, tm.tm_sec, tm.tm_wday);
 
 	for (i = 0; i < 7; i++)
 		data[i] &= ~ALARM_ENABLE_MASK;
