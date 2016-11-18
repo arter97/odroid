@@ -193,7 +193,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 ARCH		?= arm
-CROSS_COMPILE	?= /home/arter97/linaro/bin/arm-linux-androideabi-
+CROSS_COMPILE	?= /home/arter97/linaro/bin/arm-eabi-
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -377,7 +377,7 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -std=gnu89
 
 # arter97's optimizations
-KBUILD_CFLAGS	+= -pipe -mno-android -fno-pic -O2 -mcpu=cortex-a15.cortex-a7 -mtune=cortex-a15.cortex-a7 -mfloat-abi=softfp -mfpu=vfpv4
+KBUILD_CFLAGS	+= -pipe -fno-pic -O2 -mcpu=cortex-a15.cortex-a7 -mtune=cortex-a15.cortex-a7 -mfloat-abi=softfp -mfpu=vfpv4
 # Other unnecessary warnings
 KBUILD_CFLAGS	+= -Wno-unused -Wno-maybe-uninitialized
 
