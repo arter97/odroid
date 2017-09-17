@@ -15,10 +15,13 @@
 #include <linux/err.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/pagemap.h>
-#include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
+#include <linux/init.h>
+#include <linux/err.h>
+#include <linux/sched.h>
+#include <linux/pagemap.h>
+#include <linux/bio.h>
 #include <linux/zstd.h>
 #include "compression.h"
 
@@ -48,7 +51,7 @@ static void zstd_free_workspace(struct list_head *ws)
 {
 	struct workspace *workspace = list_entry(ws, struct workspace, list);
 
-	kvfree(workspace->mem);
+	vfree(workspace->mem);
 	kfree(workspace->buf);
 	kfree(workspace);
 }
@@ -59,15 +62,15 @@ static struct list_head *zstd_alloc_workspace(void)
 			zstd_get_btrfs_parameters(ZSTD_BTRFS_MAX_INPUT);
 	struct workspace *workspace;
 
-	workspace = kzalloc(sizeof(*workspace), GFP_KERNEL);
+	workspace = kzalloc(sizeof(*workspace), GFP_NOFS);
 	if (!workspace)
 		return ERR_PTR(-ENOMEM);
 
 	workspace->size = max_t(size_t,
 			ZSTD_CStreamWorkspaceBound(params.cParams),
 			ZSTD_DStreamWorkspaceBound(ZSTD_BTRFS_MAX_INPUT));
-	workspace->mem = kvmalloc(workspace->size, GFP_KERNEL);
-	workspace->buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	workspace->mem = vmalloc(workspace->size);
+	workspace->buf = kmalloc(PAGE_SIZE, GFP_NOFS);
 	if (!workspace->mem || !workspace->buf)
 		goto fail;
 
@@ -81,11 +84,13 @@ fail:
 
 static int zstd_compress_pages(struct list_head *ws,
 		struct address_space *mapping,
-		u64 start,
+		u64 start, unsigned long len,
 		struct page **pages,
+		unsigned long nr_dest_pages,
 		unsigned long *out_pages,
 		unsigned long *total_in,
-		unsigned long *total_out)
+		unsigned long *total_out,
+		unsigned long max_out)
 {
 	struct workspace *workspace = list_entry(ws, struct workspace, list);
 	ZSTD_CStream *stream;
@@ -97,9 +102,6 @@ static int zstd_compress_pages(struct list_head *ws,
 	ZSTD_outBuffer out_buf = { NULL, 0, 0 };
 	unsigned long tot_in = 0;
 	unsigned long tot_out = 0;
-	unsigned long len = *total_out;
-	const unsigned long nr_dest_pages = *out_pages;
-	unsigned long max_out = nr_dest_pages * PAGE_SIZE;
 	ZSTD_parameters params = zstd_get_btrfs_parameters(len);
 
 	*out_pages = 0;
@@ -259,19 +261,21 @@ out:
 	return ret;
 }
 
-static int zstd_decompress_bio(struct list_head *ws,
-				struct page **pages_in,
-				u64 disk_start,
-				struct bio *orig_bio,
-				size_t srclen)
+static int zstd_decompress_biovec(struct list_head *ws, struct page **pages_in,
+		u64 disk_start,
+		struct bio_vec *bvec,
+		int vcnt,
+		size_t srclen)
 {
 	struct workspace *workspace = list_entry(ws, struct workspace, list);
 	ZSTD_DStream *stream;
 	int ret = 0;
 	unsigned long page_in_index = 0;
+	unsigned long page_out_index = 0;
 	unsigned long total_pages_in = DIV_ROUND_UP(srclen, PAGE_SIZE);
 	unsigned long buf_start;
 	unsigned long total_out = 0;
+	unsigned long pg_offset = 0;
 	ZSTD_inBuffer in_buf = { NULL, 0, 0 };
 	ZSTD_outBuffer out_buf = { NULL, 0, 0 };
 
@@ -306,7 +310,9 @@ static int zstd_decompress_bio(struct list_head *ws,
 		out_buf.pos = 0;
 
 		ret = btrfs_decompress_buf2page(out_buf.dst, buf_start,
-				total_out, disk_start, orig_bio);
+				total_out, disk_start,
+				bvec, vcnt,
+				&page_out_index, &pg_offset);
 		if (ret == 0)
 			break;
 
@@ -331,7 +337,7 @@ static int zstd_decompress_bio(struct list_head *ws,
 		}
 	}
 	ret = 0;
-	zero_fill_bio(orig_bio);
+	btrfs_clear_biovec_end(bvec, vcnt, page_out_index, pg_offset);
 done:
 	if (in_buf.src)
 		kunmap(pages_in[page_in_index]);
@@ -426,6 +432,6 @@ const struct btrfs_compress_op btrfs_zstd_compress = {
 	.alloc_workspace = zstd_alloc_workspace,
 	.free_workspace = zstd_free_workspace,
 	.compress_pages = zstd_compress_pages,
-	.decompress_bio = zstd_decompress_bio,
+	.decompress_biovec = zstd_decompress_biovec,
 	.decompress = zstd_decompress,
 };
