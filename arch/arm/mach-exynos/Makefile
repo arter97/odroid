@@ -22,4 +22,4 @@ AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
 AFLAGS_sleep.o			:=-Wa,-march=armv7-a$(plus_sec)
 
 obj-$(CONFIG_EXYNOS5420_MCPM)	+= mcpm-exynos.o
-CFLAGS_mcpm-exynos.o		+= -march=armv7-a
+CFLAGS_mcpm-exynos.o		+= -mcpu=cortex-a15.cortex-a7
